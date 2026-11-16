@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trivia Night Scoreboard</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  :root{--ink:#3a0b5a;--coral:#ff8a80;--peach:#fad7b8;--green:#a8e6a1;--blue:#a9e3f9;--purple:#cdb8f5;--yellow:#f5d84b;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Segoe UI",Arial,sans-serif;color:var(--ink);overflow:hidden;
+    background:
+      linear-gradient(90deg,var(--coral) 0 33.33%,var(--peach) 33.33% 66.66%,var(--green) 66.66%) top/100% 50% no-repeat,
+      linear-gradient(90deg,var(--blue) 0 33.33%,var(--yellow) 33.33% 66.66%,var(--purple) 66.66%) bottom/100% 50% no-repeat;}
+  .card{position:absolute;inset:4vh 6vw;background:#eef0f4;border-radius:4vh;box-shadow:0 1.2vh 3vh rgba(58,11,90,.25);
+    display:flex;flex-direction:column;padding:3vh 4vw 2vh}
+  .head{display:flex;align-items:baseline;justify-content:center;gap:2vw;margin-bottom:2.5vh}
+  h1{background:var(--yellow);padding:.4vh 3vw;font-size:6vh;font-weight:800;letter-spacing:.05em}
+  .sub{font-size:3.2vh;font-weight:700}
+  #board{flex:1;display:flex;flex-direction:column;justify-content:space-evenly;min-height:0}
+  .row{display:grid;grid-template-columns:4.5vw 34vw 1fr 6vw;align-items:center;gap:1.2vw;flex:1;max-height:9vh;min-height:0}
+  .rank{font-size:var(--fs);font-weight:800;text-align:right}
+  .name{font-size:var(--fs);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .track{height:70%;background:rgba(58,11,90,.08);border-radius:1vh;overflow:hidden}
+  .bar{height:100%;border-radius:1vh;transition:width .8s ease}
+  .score{font-size:var(--fs);font-weight:800;text-align:left}
+  .lead .name,.lead .rank,.lead .score{color:#5b0f8f}
+  .wait{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh}
+  .wait b{font-size:10vh;font-weight:800}
+  .wait span{font-size:3.5vh}
+  #status{font-size:1.6vh;opacity:.55;text-align:right;margin-top:1vh}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head"><h1>Scoreboard</h1><div class="sub" id="sub"></div></div>
+  <div id="board"><div class="wait"><b>Scores coming up</b><span>Grab a drink. We'll be right back.</span></div></div>
+  <div id="status">Waiting for scores</div>
+</div>
+<script>
+/* ===== Settings: change these if the repo or branch changes ===== */
+const OWNER = "compitaconsulting";
+const REPO = "triviascoring";
+const BRANCH = "main";
+const POLL_SECONDS = 30;
+/* Leave blank to use the only .xlsx file in the repo's top folder. */
+const FILE = "";
+/* ================================================================= */
+
+const COLORS = ["#ff8a80","#f5d84b","#a8e6a1","#a9e3f9","#cdb8f5","#fab07a"];
+let listEtag = null, lastSha = null;
+
+/* ---- parsing (kept free of page code so it can be tested) ---- */
+function parseScores(wb){
+  const norm = v => String(v ?? "").trim();
+  const num = v => (typeof v === "number" && isFinite(v)) ? v : (norm(v) !== "" && !isNaN(+norm(v)) ? +norm(v) : null);
+  const views = (wb.Workbook && wb.Workbook.Views) || [];
+  const active = views.length ? (views[0].activeTab || 0) : 0;
+  const order = [wb.SheetNames[active], ...wb.SheetNames.filter((_,i)=>i!==active)].filter(Boolean);
+  for (const name of order){
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, raw:true, defval:null});
+    for (let h = 0; h < Math.min(rows.length, 20); h++){
+      const hdr = (rows[h] || []).map(c => norm(c).toUpperCase());
+      const teamCol = hdr.findIndex(c => /^TEAM/.test(c));
+      if (teamCol < 0) continue;
+      const totalCol = hdr.findIndex(c => /^(TOTAL|FINAL TOTAL|GRAND TOTAL)$/.test(c));
+      const wagerCol = hdr.findIndex(c => /^WAGER/.test(c));
+      const rightCol = hdr.findIndex(c => /^RIGHT/.test(c));
+      const roundCols = hdr.map((c,i)=>({c,i})).filter(o => /^(R\s?\d+|ROUND\s?\d+)$/.test(o.c)).map(o=>o.i);
+      const played = roundCols.map(() => false);
+      const teams = [];
+      let finalDone = false;
+      for (let r = h+1; r < rows.length; r++){
+        const row = rows[r] || [];
+        const team = norm(row[teamCol]);
+        if (!team || /^(TEAM|TOTALS?|AVERAGE|AVG|MEAN)$/i.test(team)) continue;
+        let roundSum = 0;
+        roundCols.forEach((ci, k) => { const v = num(row[ci]); if (v !== null){ roundSum += v; if (v !== 0) played[k] = true; } });
+        const wager = wagerCol >= 0 ? num(row[wagerCol]) : null;
+        if (wager && rightCol >= 0 && norm(row[rightCol]) !== "") finalDone = true;
+        const t = totalCol >= 0 ? num(row[totalCol]) : null;
+        const anyScore = t !== null || roundCols.some(ci => num(row[ci]) !== null);
+        if (!anyScore) continue;  /* notes or labels under the table */
+        teams.push({team, total: t !== null ? t : roundSum});
+      }
+      if (teams.length){
+        teams.sort((a,b) => b.total - a.total || a.team.localeCompare(b.team));
+        let rank = 0, prev = null;
+        teams.forEach((t,i) => { if (t.total !== prev){ rank = i+1; prev = t.total; } t.rank = rank; });
+        const lastRound = played.lastIndexOf(true) + 1;
+        return {sheet:name, teams, lastRound, finalDone};
+      }
+    }
+  }
+  return {sheet:null, teams:[], lastRound:0, finalDone:false};
+}
+/* ---- end parsing ---- */
+
+function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function render(res){
+  const board = document.getElementById("board");
+  document.getElementById("sub").textContent = res.finalDone ? "Final Scores" : (res.lastRound ? `After Round ${res.lastRound}` : "");
+  if (!res.teams.length){
+    board.innerHTML = '<div class="wait"><b>Scores coming up</b><span>Grab a drink. We\'ll be right back.</span></div>';
+    return;
+  }
+  const max = Math.max(1, ...res.teams.map(t => t.total));
+  const n = res.teams.length;
+  const fs = Math.max(2.4, Math.min(4.6, 48 / n));
+  board.style.setProperty("--fs", fs + "vh");
+  board.innerHTML = res.teams.map((t,i) => `
+    <div class="row${t.rank === 1 ? " lead" : ""}">
+      <div class="rank">${t.rank}</div>
+      <div class="name">${esc(t.team)}</div>
+      <div class="track"><div class="bar" style="width:0;background:${COLORS[i % COLORS.length]}" data-w="${Math.max(2, 100 * t.total / max)}"></div></div>
+      <div class="score">${Number.isInteger(t.total) ? t.total : t.total.toFixed(1)}</div>
+    </div>`).join("");
+  requestAnimationFrame(() => document.querySelectorAll(".bar").forEach(b => b.style.width = b.dataset.w + "%"));
+}
+
+function status(msg){ document.getElementById("status").textContent = msg; }
+
+async function poll(){
+  try{
+    const headers = {"Accept":"application/vnd.github+json"};
+    if (listEtag) headers["If-None-Match"] = listEtag;
+    const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/?ref=${BRANCH}`, {headers, cache:"no-store"});
+    if (r.status === 304) return;
+    if (!r.ok){ status(`Could not reach GitHub (${r.status}). Retrying.`); return; }
+    listEtag = r.headers.get("ETag");
+    const files = (await r.json()).filter(f => f.type === "file" && /\.xlsx$/i.test(f.name) && !f.name.startsWith("~$"));
+    const pick = FILE ? files.find(f => f.name === FILE) : (files.length === 1 ? files[0] : files.find(f => /score/i.test(f.name)) || files[0]);
+    if (!pick){ status("No scoresheet in the repo yet"); return; }
+    if (pick.sha === lastSha) return;
+    const b = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${pick.sha}`, {headers:{"Accept":"application/vnd.github.raw"}});
+    if (!b.ok){ status(`Could not download ${pick.name} (${b.status}). Retrying.`); return; }
+    const wb = XLSX.read(await b.arrayBuffer(), {type:"array"});
+    render(parseScores(wb));
+    lastSha = pick.sha;
+    status(`Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from ${pick.name}`);
+  }catch(e){ status("Connection problem. Retrying."); }
+}
+
+document.addEventListener("keydown", e => { if (e.key === "f" || e.key === "F"){ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }});
+poll(); setInterval(poll, POLL_SECONDS * 1000);
+</script>
+</body>
+</html>
