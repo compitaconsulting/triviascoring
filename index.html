@@ -20,6 +20,7 @@
   .lead .name,.lead .score{font-weight:800}
   .wait{flex:1;display:flex;align-items:center;justify-content:center;font-size:8vh;font-weight:700}
   #status{font-size:1.6vh;color:#555;text-align:right}
+  #status a{color:#888}
 </style>
 </head>
 <body>
@@ -119,11 +120,11 @@ async function poll(){
     if (!pick){ status("No scoresheet in the repo yet"); return; }
     if (pick.sha === lastSha) return;
     const b = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${pick.sha}`, {headers:{"Accept":"application/vnd.github.raw"}});
-    if (!b.ok){ status(`Could not download ${pick.name} (${b.status}). Retrying.`); return; }
+    if (!b.ok){ status(`Could not download the scoresheet (${b.status}). Retrying.`); return; }
     const wb = XLSX.read(await b.arrayBuffer(), {type:"array"});
     render(parseScores(wb));
     lastSha = pick.sha;
-    status(`Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from ${pick.name}`);
+    document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from D2 repo via <a href="https://compitaconsulting.github.io/triviascoring/" target="_blank" rel="noopener">https://compitaconsulting.github.io/triviascoring/</a>`;
   }catch(e){ status("Connection problem. Retrying."); }
 }
 
