@@ -6,26 +6,48 @@
 <title>Trivia Night Scoreboard</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
+  :root{--gold:#ffd54a;--silver:#d6e2ea;--bronze:#ff9f5a;--cyan:#38e8ff;--up:#3dff9a;--down:#ff4d6d;--row:#0e1424}
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;background:#000;color:#fff}
-  body{font-family:"Segoe UI",Arial,sans-serif;overflow:hidden;display:flex;flex-direction:column;padding:5vh 10vw 3vh}
-  .head{text-align:center;margin-bottom:4vh}
-  h1{font-size:7vh;font-weight:700;letter-spacing:.04em}
-  .sub{font-size:3vh;color:#aaa;margin-top:.5vh;min-height:3vh}
-  #board{flex:1;display:flex;flex-direction:column;justify-content:flex-start;gap:1.2vh;min-height:0}
-  .row{display:grid;grid-template-columns:6vw 1fr 10vw;align-items:baseline;font-size:var(--fs)}
-  .rank{color:#888;font-weight:600}
-  .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:2vw}
-  .score{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
-  .lead .name,.lead .score{font-weight:800}
-  .wait{flex:1;display:flex;align-items:center;justify-content:center;font-size:8vh;font-weight:700}
-  #status{font-size:1.6vh;color:#555;text-align:right}
-  #status a{color:#888}
+  html,body{height:100%}
+  body{font-family:"Segoe UI",Arial,sans-serif;color:#fff;overflow:hidden;display:flex;flex-direction:column;padding:4vh 8vw 2.5vh;
+    background:
+      radial-gradient(ellipse at 50% -10%,rgba(56,232,255,.18),transparent 55%),
+      radial-gradient(ellipse at 100% 110%,rgba(140,80,255,.18),transparent 50%),
+      linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px) 0 0/100% 4vh,
+      linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px) 0 0/4vh 100%,
+      #05060b;}
+  .head{text-align:center;margin-bottom:3vh}
+  h1{font-size:6.5vh;font-weight:800;letter-spacing:.35em;padding-left:.35em;
+     text-shadow:0 0 1.2vh rgba(56,232,255,.75),0 0 4vh rgba(56,232,255,.35)}
+  .sub{font-size:2.6vh;letter-spacing:.3em;text-transform:uppercase;color:var(--cyan);margin-top:.8vh;min-height:3vh;opacity:.9}
+  #board{flex:1;display:flex;flex-direction:column;gap:1vh;min-height:0}
+  .row{flex:1;max-height:9vh;min-height:0;display:grid;grid-template-columns:var(--fs2) 6vw 1fr 9vw;align-items:center;gap:1.5vw;
+       padding:0 1.5vw;background:linear-gradient(90deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border-radius:1vh;
+       font-size:var(--fs);opacity:0;transform:translateX(-4vw);animation:slide .55s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes slide{to{opacity:1;transform:none}}
+  .rank{width:var(--fs2);height:var(--fs2);border-radius:50%;display:flex;align-items:center;justify-content:center;
+        font-weight:800;font-size:.8em;background:rgba(255,255,255,.08);color:#cfd6e4}
+  .move{font-size:.6em;font-weight:800;letter-spacing:.05em;text-align:center}
+  .move.up{color:var(--up)} .move.down{color:var(--down)} .move.same{color:#4a5468} .move.new{color:var(--cyan)}
+  .name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .score{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+  .p1{background:linear-gradient(90deg,rgba(255,213,74,.28),rgba(255,213,74,.05));box-shadow:0 0 2.5vh rgba(255,213,74,.35),inset 0 0 0 .15vh rgba(255,213,74,.7)}
+  .p2{background:linear-gradient(90deg,rgba(214,226,234,.2),rgba(214,226,234,.04));box-shadow:0 0 2vh rgba(214,226,234,.2),inset 0 0 0 .15vh rgba(214,226,234,.55)}
+  .p3{background:linear-gradient(90deg,rgba(255,159,90,.22),rgba(255,159,90,.04));box-shadow:0 0 2vh rgba(255,159,90,.25),inset 0 0 0 .15vh rgba(255,159,90,.6)}
+  .p1 .rank{background:var(--gold);color:#1a1300} .p2 .rank{background:var(--silver);color:#11161a} .p3 .rank{background:var(--bronze);color:#1f0e00}
+  .p1 .score{color:var(--gold);text-shadow:0 0 1.5vh rgba(255,213,74,.6)}
+  .wait{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh}
+  .wait b{font-size:7vh;font-weight:800;letter-spacing:.1em;text-shadow:0 0 2vh rgba(56,232,255,.5)}
+  .dots span{display:inline-block;width:1.4vh;height:1.4vh;margin:0 .6vh;border-radius:50%;background:var(--cyan);animation:pulse 1.2s infinite ease-in-out}
+  .dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+  @keyframes pulse{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+  #status{font-size:1.6vh;color:#5a6478;text-align:right;margin-top:1vh}
+  #status a{color:#8a96ad}
 </style>
 </head>
 <body>
-<div class="head"><h1>Scoreboard</h1><div class="sub" id="sub"></div></div>
-<div id="board"><div class="wait">Scores coming up</div></div>
+<div class="head"><h1>SCOREBOARD</h1><div class="sub" id="sub"></div></div>
+<div id="board"><div class="wait"><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div></div>
 <div id="status">Waiting for scores</div>
 <script>
 /* ===== Settings: change these if the repo or branch changes ===== */
@@ -85,24 +107,57 @@ function parseScores(wb){
 }
 /* ---- end parsing ---- */
 
+
+function fmt(v){ return Number.isInteger(v) ? String(v) : v.toFixed(1); }
+function countUp(){
+  const els = [...document.querySelectorAll(".score")], start = performance.now(), dur = 1400;
+  (function step(now){
+    const k = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - k, 3);
+    els.forEach(el => { const a = +el.dataset.from, b = +el.dataset.to; el.textContent = k < 1 ? String(Math.round(a + (b - a) * e)) : fmt(b); });
+    if (k < 1) requestAnimationFrame(step);
+  })(start);
+}
+/* Remembers the last board (in this browser only) so arrows show who moved. Ignored after 6 hours. */
+function loadPrev(){
+  try{ const p = JSON.parse(localStorage.getItem("triviaPrev") || "null"); return p && Date.now() - p.at < 6*3600e3 ? p : null; }catch(e){ return null; }
+}
+function savePrev(teams){
+  try{ localStorage.setItem("triviaPrev", JSON.stringify({at:Date.now(), ranks:Object.fromEntries(teams.map(t=>[t.team,t.rank])), totals:Object.fromEntries(teams.map(t=>[t.team,t.total]))})); }catch(e){}
+}
+
 function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function render(res){
   const board = document.getElementById("board");
   document.getElementById("sub").textContent = res.finalDone ? "Final Scores" : (res.lastRound ? `After Round ${res.lastRound}` : "");
   if (!res.teams.length){
-    board.innerHTML = '<div class="wait">Scores coming up</div>';
+    board.innerHTML = '<div class="wait"><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div>';
     return;
   }
   const n = res.teams.length;
-  const fs = Math.max(2.4, Math.min(5, (70 / n - 1.2) / 1.1));
+  const fs = Math.max(2.3, Math.min(4.6, (68 / n - 1) / 1.25));
   board.style.setProperty("--fs", fs + "vh");
-  board.innerHTML = res.teams.map(t => `
-    <div class="row${t.rank === 1 ? " lead" : ""}">
+  board.style.setProperty("--fs2", (fs * 1.45) + "vh");
+  const prev = loadPrev();
+  board.innerHTML = res.teams.map((t,i) => {
+    let mv = "", cls = "same";
+    if (prev){
+      const p = prev.ranks[t.team];
+      if (p === undefined){ mv = "NEW"; cls = "new"; }
+      else if (p > t.rank){ mv = "\u25B2" + (p - t.rank); cls = "up"; }
+      else if (p < t.rank){ mv = "\u25BC" + (t.rank - p); cls = "down"; }
+      else { mv = "\u2013"; }
+    }
+    const from = prev && prev.totals[t.team] !== undefined ? prev.totals[t.team] : 0;
+    return `<div class="row${t.rank <= 3 ? " p" + t.rank : ""}" style="animation-delay:${i * 70}ms">
       <div class="rank">${t.rank}</div>
+      <div class="move ${cls}">${mv}</div>
       <div class="name">${esc(t.team)}</div>
-      <div class="score">${Number.isInteger(t.total) ? t.total : t.total.toFixed(1)}</div>
-    </div>`).join("");
+      <div class="score" data-from="${from}" data-to="${t.total}">${fmt(from)}</div>
+    </div>`;
+  }).join("");
+  savePrev(res.teams);
+  setTimeout(countUp, 300);
 }
 
 function status(msg){ document.getElementById("status").textContent = msg; }
