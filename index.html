@@ -49,6 +49,9 @@
   .loadbar{width:36vw;height:1vh;border-radius:1vh;background:rgba(56,232,255,.15);overflow:hidden;margin-top:1vh}
   .loadbar i{display:block;height:100%;width:0;background:var(--cyan);box-shadow:0 0 2vh var(--cyan);animation:fill var(--hold) linear forwards}
   @keyframes fill{to{width:100%}}
+  .hint{position:fixed;left:0;right:0;bottom:12vh;text-align:center;font-size:2.4vh;letter-spacing:.3em;text-transform:uppercase;
+        color:var(--cyan);animation:blink 1.6s ease-in-out infinite;pointer-events:none}
+  @keyframes blink{0%,100%{opacity:.25}50%{opacity:.9}}
   #status{font-size:1.6vh;color:#5a6478;text-align:right;margin-top:1vh}
   #status a{color:#8a96ad}
 </style>
@@ -134,7 +137,8 @@ function countUp(el){
 /* Step-by-step reveal: rows are counted from the bottom (last place) up. */
 let shown = 0;
 function rows(){ return [...document.querySelectorAll("#board .row")]; }
-function showRow(el){ el.classList.remove("hide"); el.classList.add("show"); setTimeout(() => countUp(el.querySelector(".score")), 250); }
+function dropHint(){ const h = document.querySelector(".hint"); if (h) h.remove(); }
+function showRow(el){ dropHint(); el.classList.remove("hide"); el.classList.add("show"); setTimeout(() => countUp(el.querySelector(".score")), 250); }
 function revealNext(){
   const r = rows(); if (shown >= r.length) return;
   shown++; showRow(r[r.length - shown]);
@@ -192,7 +196,8 @@ function render(res){
   }).join("");
   savePrev(res.teams);
   shown = 0;
-  if (!STEP_REVEAL) revealAll(70);
+  if (STEP_REVEAL) board.insertAdjacentHTML("beforeend", '<div class="hint">Press Space or click to reveal</div>');
+  else revealAll(70);
 }
 
 let revealing = false;
@@ -203,7 +208,11 @@ function reveal(res, then){
   const board = document.getElementById("board");
   board.style.setProperty("--hold", HOLD_MS + "ms");
   board.innerHTML = '<div class="wait"><img src="d2-logo.png" alt=""><b>Scores coming up</b><div class="loadbar"><i></i></div></div>';
-  setTimeout(() => { render(res); revealing = false; if (then) then(); }, HOLD_MS);
+  setTimeout(() => {
+    try{ render(res); if (then) then(); }
+    catch(e){ status("Could not draw the board: " + e.message); }
+    finally{ revealing = false; }
+  }, HOLD_MS);
 }
 function status(msg){ document.getElementById("status").textContent = msg; }
 
@@ -214,10 +223,37 @@ async function poll(){
     if (listEtag) headers["If-None-Match"] = listEtag;
     const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/?ref=${BRANCH}`, {headers, cache:"no-store"});
     if (r.status === 304) return;
-    if (!r.ok){ status(`Could not reach GitHub (${r.status}). Retrying.`); return; }
+    if (!r.ok){
+      const reset = +r.headers.get("x-ratelimit-reset");
+      if ((r.status === 403 || r.status === 429) && reset){
+        status(`GitHub is limiting requests until ${new Date(reset * 1000).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})}. The board will update after that.`);
+      } else status(`Could not reach GitHub (${r.status}). Retrying.`);
+      return;
+    }
     listEtag = r.headers.get("ETag");
     const files = (await r.json()).filter(f => f.type === "file" && /\.xlsx$/i.test(f.name) && !f.name.startsWith("~$"));
     const pick = FILE ? files.find(f => f.name === FILE) : (files.length === 1 ? files[0] : files.find(f => /score/i.test(f.name)) || files[0]);
     if (!pick){ status("No scoresheet in the repo yet"); return; }
     if (pick.sha === lastSha) return;
-    const b = await fetch
+    const b = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${pick.sha}`, {headers:{"Accept":"application/vnd.github.raw"}});
+    if (!b.ok){ status(`Could not download the scoresheet (${b.status}). Retrying.`); return; }
+    const wb = XLSX.read(await b.arrayBuffer(), {type:"array"});
+    const res = parseScores(wb);
+    lastSha = pick.sha;
+    const stamp = () => document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from D2 repo via <a href="https://compitaconsulting.github.io/triviascoring/" target="_blank" rel="noopener">https://compitaconsulting.github.io/triviascoring/</a>`;
+    if (res.teams.length) reveal(res, stamp); else { render(res); stamp(); }
+  }catch(e){ status("Connection problem. Retrying."); }
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "f" || e.key === "F"){ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); return; }
+  if (revealing) return;
+  if (e.key === " " || e.key === "ArrowRight" || e.key === "PageDown"){ e.preventDefault(); revealNext(); }
+  else if (e.key === "ArrowLeft" || e.key === "PageUp"){ e.preventDefault(); hideLast(); }
+  else if (e.key === "a" || e.key === "A"){ revealAll(); }
+});
+document.addEventListener("click", e => { if (e.target.closest("a") || revealing) return; revealNext(); });
+poll(); setInterval(poll, POLL_SECONDS * 1000);
+</script>
+</body>
+</html>
