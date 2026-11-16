@@ -17,6 +17,9 @@
       linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px) 0 0/4vh 100%,
       #05060b;}
   .head{text-align:center;margin-bottom:3vh}
+  .logo{position:absolute;top:2.5vh;left:2.5vw;height:14vh;background:radial-gradient(circle closest-side,#fff 96%,transparent 97%)}
+  body.waiting .logo{display:none}
+  .wait img{height:30vh;background:radial-gradient(circle closest-side,#fff 96%,transparent 97%)}
   h1{font-size:6.5vh;font-weight:800;letter-spacing:.35em;padding-left:.35em;
      text-shadow:0 0 1.2vh rgba(56,232,255,.75),0 0 4vh rgba(56,232,255,.35)}
   .sub{font-size:2.6vh;letter-spacing:.3em;text-transform:uppercase;color:var(--cyan);margin-top:.8vh;min-height:3vh;opacity:.9}
@@ -45,9 +48,10 @@
   #status a{color:#8a96ad}
 </style>
 </head>
-<body>
+<body class="waiting">
+<img class="logo" src="d2-logo.png" alt="D2 Productions">
 <div class="head"><h1>SCOREBOARD</h1><div class="sub" id="sub"></div></div>
-<div id="board"><div class="wait"><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div></div>
+<div id="board"><div class="wait"><img src="d2-logo.png" alt=""><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div></div>
 <div id="status">Waiting for scores</div>
 <script>
 /* ===== Settings: change these if the repo or branch changes ===== */
@@ -130,8 +134,9 @@ function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"
 function render(res){
   const board = document.getElementById("board");
   document.getElementById("sub").textContent = res.finalDone ? "Final Scores" : (res.lastRound ? `After Round ${res.lastRound}` : "");
+  document.body.classList.toggle("waiting", !res.teams.length);
   if (!res.teams.length){
-    board.innerHTML = '<div class="wait"><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div>';
+    board.innerHTML = '<div class="wait"><img src="d2-logo.png" alt=""><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div>';
     return;
   }
   const n = res.teams.length;
