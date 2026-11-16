@@ -26,7 +26,9 @@
   #board{flex:1;display:flex;flex-direction:column;gap:1vh;min-height:0}
   .row{flex:1;max-height:9vh;min-height:0;display:grid;grid-template-columns:var(--fs2) 6vw 1fr 9vw;align-items:center;gap:1.5vw;
        padding:0 1.5vw;background:linear-gradient(90deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border-radius:1vh;
-       font-size:var(--fs);opacity:0;transform:translateX(-4vw);animation:slide .55s cubic-bezier(.2,.8,.2,1) forwards}
+       font-size:var(--fs);opacity:0;transform:translateX(-4vw)}
+  .row.show{animation:slide .55s cubic-bezier(.2,.8,.2,1) forwards}
+  .row.hide{opacity:0;transform:translateX(-4vw);animation:none}
   @keyframes slide{to{opacity:1;transform:none}}
   .rank{width:var(--fs2);height:var(--fs2);border-radius:50%;display:flex;align-items:center;justify-content:center;
         font-weight:800;font-size:.8em;background:rgba(255,255,255,.08);color:#cfd6e4}
@@ -63,7 +65,10 @@ const REPO = "triviascoring";
 const BRANCH = "main";
 const POLL_SECONDS = 30;
 /* How long "Scores coming up" shows, with its loading bar, before new scores appear. */
-const HOLD_MS = 3000;
+const HOLD_MS = 4000;
+/* true: click, Space, or Right Arrow shows one team at a time, last place first.
+   Left Arrow hides the last one shown. A shows all. false: every team appears on its own. */
+const STEP_REVEAL = true;
 /* Leave blank to use the only .xlsx file in the repo's top folder. */
 const FILE = "";
 /* ================================================================= */
@@ -118,13 +123,32 @@ function parseScores(wb){
 
 
 function fmt(v){ return Number.isInteger(v) ? String(v) : v.toFixed(1); }
-function countUp(){
-  const els = [...document.querySelectorAll(".score")], start = performance.now(), dur = 1400;
+function countUp(el){
+  const a = +el.dataset.from, b = +el.dataset.to, start = performance.now(), dur = 1200;
   (function step(now){
     const k = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - k, 3);
-    els.forEach(el => { const a = +el.dataset.from, b = +el.dataset.to; el.textContent = k < 1 ? String(Math.round(a + (b - a) * e)) : fmt(b); });
+    el.textContent = k < 1 ? String(Math.round(a + (b - a) * e)) : fmt(b);
     if (k < 1) requestAnimationFrame(step);
   })(start);
+}
+/* Step-by-step reveal: rows are counted from the bottom (last place) up. */
+let shown = 0;
+function rows(){ return [...document.querySelectorAll("#board .row")]; }
+function showRow(el){ el.classList.remove("hide"); el.classList.add("show"); setTimeout(() => countUp(el.querySelector(".score")), 250); }
+function revealNext(){
+  const r = rows(); if (shown >= r.length) return;
+  shown++; showRow(r[r.length - shown]);
+}
+function hideLast(){
+  const r = rows(); if (!shown) return;
+  const el = r[r.length - shown]; shown--;
+  el.classList.remove("show"); el.classList.add("hide");
+  const s = el.querySelector(".score"); s.textContent = fmt(+s.dataset.from);
+}
+function revealAll(stagger){
+  const r = rows();
+  for (let k = shown; k < r.length; k++){ const el = r[r.length - 1 - k]; setTimeout(() => showRow(el), (k - shown) * (stagger || 60)); }
+  shown = r.length;
 }
 /* Remembers the last board (in this browser only) so arrows show who moved. Ignored after 6 hours. */
 function loadPrev(){
@@ -159,7 +183,7 @@ function render(res){
       else { mv = "\u2013"; }
     }
     const from = prev && prev.totals[t.team] !== undefined ? prev.totals[t.team] : 0;
-    return `<div class="row${t.rank <= 3 ? " p" + t.rank : ""}" style="animation-delay:${i * 70}ms">
+    return `<div class="row${t.rank <= 3 ? " p" + t.rank : ""}">
       <div class="rank">${t.rank}</div>
       <div class="move ${cls}">${mv}</div>
       <div class="name">${esc(t.team)}</div>
@@ -167,7 +191,8 @@ function render(res){
     </div>`;
   }).join("");
   savePrev(res.teams);
-  setTimeout(countUp, 300);
+  shown = 0;
+  if (!STEP_REVEAL) revealAll(70);
 }
 
 let revealing = false;
@@ -195,18 +220,4 @@ async function poll(){
     const pick = FILE ? files.find(f => f.name === FILE) : (files.length === 1 ? files[0] : files.find(f => /score/i.test(f.name)) || files[0]);
     if (!pick){ status("No scoresheet in the repo yet"); return; }
     if (pick.sha === lastSha) return;
-    const b = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${pick.sha}`, {headers:{"Accept":"application/vnd.github.raw"}});
-    if (!b.ok){ status(`Could not download the scoresheet (${b.status}). Retrying.`); return; }
-    const wb = XLSX.read(await b.arrayBuffer(), {type:"array"});
-    const res = parseScores(wb);
-    lastSha = pick.sha;
-    const stamp = () => document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from D2 repo via <a href="https://compitaconsulting.github.io/triviascoring/" target="_blank" rel="noopener">https://compitaconsulting.github.io/triviascoring/</a>`;
-    if (res.teams.length) reveal(res, stamp); else { render(res); stamp(); }
-  }catch(e){ status("Connection problem. Retrying."); }
-}
-
-document.addEventListener("keydown", e => { if (e.key === "f" || e.key === "F"){ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }});
-poll(); setInterval(poll, POLL_SECONDS * 1000);
-</script>
-</body>
-</html>
+    const b = await fetch
