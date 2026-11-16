@@ -60,7 +60,7 @@
 <img class="logo" src="d2-logo.png" alt="D2 Productions">
 <div class="head"><h1>SCOREBOARD</h1><div class="sub" id="sub"></div></div>
 <div id="board"><div class="wait"><img src="d2-logo.png" alt=""><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div></div>
-<div id="status">Waiting for scores</div>
+<div id="status">Checking GitHub for the scoresheet</div>
 <script>
 /* ===== Settings: change these if the repo or branch changes ===== */
 const OWNER = "compitaconsulting";
@@ -241,7 +241,8 @@ async function poll(){
     const res = parseScores(wb);
     lastSha = pick.sha;
     const stamp = () => document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from D2 repo via <a href="https://compitaconsulting.github.io/triviascoring/" target="_blank" rel="noopener">https://compitaconsulting.github.io/triviascoring/</a>`;
-    if (res.teams.length) reveal(res, stamp); else { render(res); stamp(); }
+    if (res.teams.length) reveal(res, stamp);
+    else { render(res); status(`Scoresheet found, but it has no teams with scores yet (checked ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})})`); }
   }catch(e){ status("Connection problem. Retrying."); }
 }
 
