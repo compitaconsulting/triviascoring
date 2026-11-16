@@ -62,21 +62,17 @@
 <div id="board"><div class="wait"><img src="d2-logo.png" alt=""><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div></div>
 <div id="status">Checking GitHub for the scoresheet</div>
 <script>
-/* ===== Settings: change these if the repo or branch changes ===== */
-const OWNER = "compitaconsulting";
-const REPO = "triviascoring";
-const BRANCH = "main";
-const POLL_SECONDS = 30;
+/* ===== Settings ===== */
+/* The scoresheet's file name in the repo. Keep it the same all night. */
+const FILE = "Scoresheet.xlsx";
+const POLL_SECONDS = 15;
 /* How long "Scores coming up" shows, with its loading bar, before new scores appear. */
 const HOLD_MS = 4000;
 /* true: click, Space, or Right Arrow shows one team at a time, last place first.
    Left Arrow hides the last one shown. A shows all. false: every team appears on its own. */
 const STEP_REVEAL = true;
-/* Leave blank to use the only .xlsx file in the repo's top folder. */
-const FILE = "";
-/* ================================================================= */
+/* ==================== */
 
-let listEtag = null, lastSha = null;
 
 /* ---- parsing (kept free of page code so it can be tested) ---- */
 function parseScores(wb){
@@ -196,7 +192,7 @@ function render(res){
   }).join("");
   savePrev(res.teams);
   shown = 0;
-  if (STEP_REVEAL) board.insertAdjacentHTML("beforeend", '<div class="hint">Here we go!</div>');
+  if (STEP_REVEAL) board.insertAdjacentHTML("beforeend", '<div class="hint">Press Space or click to reveal</div>');
   else revealAll(70);
 }
 
@@ -216,30 +212,20 @@ function reveal(res, then){
 }
 function status(msg){ document.getElementById("status").textContent = msg; }
 
+let lastHash = null;
 async function poll(){
   if (revealing) return;
   try{
-    const headers = {"Accept":"application/vnd.github+json"};
-    if (listEtag) headers["If-None-Match"] = listEtag;
-    const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/?ref=${BRANCH}`, {headers, cache:"no-store"});
-    if (r.status === 304) return;
-    if (!r.ok){
-      const reset = +r.headers.get("x-ratelimit-reset");
-      if ((r.status === 403 || r.status === 429) && reset){
-        status(`GitHub is limiting requests until ${new Date(reset * 1000).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})}. The board will update after that.`);
-      } else status(`Could not reach GitHub (${r.status}). Retrying.`);
-      return;
-    }
-    listEtag = r.headers.get("ETag");
-    const files = (await r.json()).filter(f => f.type === "file" && /\.xlsx$/i.test(f.name) && !f.name.startsWith("~$"));
-    const pick = FILE ? files.find(f => f.name === FILE) : (files.length === 1 ? files[0] : files.find(f => /score/i.test(f.name)) || files[0]);
-    if (!pick){ status("No scoresheet in the repo yet"); return; }
-    if (pick.sha === lastSha) return;
-    const b = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${pick.sha}`, {headers:{"Accept":"application/vnd.github.raw"}});
-    if (!b.ok){ status(`Could not download the scoresheet (${b.status}). Retrying.`); return; }
-    const wb = XLSX.read(await b.arrayBuffer(), {type:"array"});
-    const res = parseScores(wb);
-    lastSha = pick.sha;
+    /* Reads the scoresheet straight from this site (GitHub Pages), which has no hourly limit.
+       The time stamp in the address makes sure a fresh copy comes back each time. */
+    const r = await fetch(`${FILE}?t=${Date.now()}`, {cache:"no-store"});
+    if (r.status === 404){ status(`No ${FILE} in the repo yet`); return; }
+    if (!r.ok){ status(`Could not load the scoresheet (${r.status}). Retrying.`); return; }
+    const buf = await r.arrayBuffer();
+    const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", buf))].map(x => x.toString(16).padStart(2,"0")).join("");
+    if (hash === lastHash) return;
+    const res = parseScores(XLSX.read(buf, {type:"array"}));
+    lastHash = hash;
     const stamp = () => document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from D2 repo via <a href="https://compitaconsulting.github.io/triviascoring/" target="_blank" rel="noopener">https://compitaconsulting.github.io/triviascoring/</a>`;
     if (res.teams.length) reveal(res, stamp);
     else { render(res); status(`Scoresheet found, but it has no teams with scores yet (checked ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})})`); }
