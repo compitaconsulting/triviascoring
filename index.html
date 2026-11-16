@@ -6,38 +6,26 @@
 <title>Trivia Night Scoreboard</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
-  :root{--ink:#3a0b5a;--coral:#ff8a80;--peach:#fad7b8;--green:#a8e6a1;--blue:#a9e3f9;--purple:#cdb8f5;--yellow:#f5d84b;}
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{font-family:"Segoe UI",Arial,sans-serif;color:var(--ink);overflow:hidden;
-    background:
-      linear-gradient(90deg,var(--coral) 0 33.33%,var(--peach) 33.33% 66.66%,var(--green) 66.66%) top/100% 50% no-repeat,
-      linear-gradient(90deg,var(--blue) 0 33.33%,var(--yellow) 33.33% 66.66%,var(--purple) 66.66%) bottom/100% 50% no-repeat;}
-  .card{position:absolute;inset:4vh 6vw;background:#eef0f4;border-radius:4vh;box-shadow:0 1.2vh 3vh rgba(58,11,90,.25);
-    display:flex;flex-direction:column;padding:3vh 4vw 2vh}
-  .head{display:flex;align-items:baseline;justify-content:center;gap:2vw;margin-bottom:2.5vh}
-  h1{background:var(--yellow);padding:.4vh 3vw;font-size:6vh;font-weight:800;letter-spacing:.05em}
-  .sub{font-size:3.2vh;font-weight:700}
-  #board{flex:1;display:flex;flex-direction:column;justify-content:space-evenly;min-height:0}
-  .row{display:grid;grid-template-columns:4.5vw 34vw 1fr 6vw;align-items:center;gap:1.2vw;flex:1;max-height:9vh;min-height:0}
-  .rank{font-size:var(--fs);font-weight:800;text-align:right}
-  .name{font-size:var(--fs);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .track{height:70%;background:rgba(58,11,90,.08);border-radius:1vh;overflow:hidden}
-  .bar{height:100%;border-radius:1vh;transition:width .8s ease}
-  .score{font-size:var(--fs);font-weight:800;text-align:left}
-  .lead .name,.lead .rank,.lead .score{color:#5b0f8f}
-  .wait{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh}
-  .wait b{font-size:10vh;font-weight:800}
-  .wait span{font-size:3.5vh}
-  #status{font-size:1.6vh;opacity:.55;text-align:right;margin-top:1vh}
+  html,body{height:100%;background:#000;color:#fff}
+  body{font-family:"Segoe UI",Arial,sans-serif;overflow:hidden;display:flex;flex-direction:column;padding:5vh 10vw 3vh}
+  .head{text-align:center;margin-bottom:4vh}
+  h1{font-size:7vh;font-weight:700;letter-spacing:.04em}
+  .sub{font-size:3vh;color:#aaa;margin-top:.5vh;min-height:3vh}
+  #board{flex:1;display:flex;flex-direction:column;justify-content:flex-start;gap:1.2vh;min-height:0}
+  .row{display:grid;grid-template-columns:6vw 1fr 10vw;align-items:baseline;font-size:var(--fs)}
+  .rank{color:#888;font-weight:600}
+  .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:2vw}
+  .score{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .lead .name,.lead .score{font-weight:800}
+  .wait{flex:1;display:flex;align-items:center;justify-content:center;font-size:8vh;font-weight:700}
+  #status{font-size:1.6vh;color:#555;text-align:right}
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="head"><h1>Scoreboard</h1><div class="sub" id="sub"></div></div>
-  <div id="board"><div class="wait"><b>Scores coming up</b><span>Grab a drink. We'll be right back.</span></div></div>
-  <div id="status">Waiting for scores</div>
-</div>
+<div class="head"><h1>Scoreboard</h1><div class="sub" id="sub"></div></div>
+<div id="board"><div class="wait">Scores coming up</div></div>
+<div id="status">Waiting for scores</div>
 <script>
 /* ===== Settings: change these if the repo or branch changes ===== */
 const OWNER = "compitaconsulting";
@@ -48,7 +36,6 @@ const POLL_SECONDS = 30;
 const FILE = "";
 /* ================================================================= */
 
-const COLORS = ["#ff8a80","#f5d84b","#a8e6a1","#a9e3f9","#cdb8f5","#fab07a"];
 let listEtag = null, lastSha = null;
 
 /* ---- parsing (kept free of page code so it can be tested) ---- */
@@ -103,21 +90,18 @@ function render(res){
   const board = document.getElementById("board");
   document.getElementById("sub").textContent = res.finalDone ? "Final Scores" : (res.lastRound ? `After Round ${res.lastRound}` : "");
   if (!res.teams.length){
-    board.innerHTML = '<div class="wait"><b>Scores coming up</b><span>Grab a drink. We\'ll be right back.</span></div>';
+    board.innerHTML = '<div class="wait">Scores coming up</div>';
     return;
   }
-  const max = Math.max(1, ...res.teams.map(t => t.total));
   const n = res.teams.length;
-  const fs = Math.max(2.4, Math.min(4.6, 48 / n));
+  const fs = Math.max(2.4, Math.min(5, (70 / n - 1.2) / 1.1));
   board.style.setProperty("--fs", fs + "vh");
-  board.innerHTML = res.teams.map((t,i) => `
+  board.innerHTML = res.teams.map(t => `
     <div class="row${t.rank === 1 ? " lead" : ""}">
       <div class="rank">${t.rank}</div>
       <div class="name">${esc(t.team)}</div>
-      <div class="track"><div class="bar" style="width:0;background:${COLORS[i % COLORS.length]}" data-w="${Math.max(2, 100 * t.total / max)}"></div></div>
       <div class="score">${Number.isInteger(t.total) ? t.total : t.total.toFixed(1)}</div>
     </div>`).join("");
-  requestAnimationFrame(() => document.querySelectorAll(".bar").forEach(b => b.style.width = b.dataset.w + "%"));
 }
 
 function status(msg){ document.getElementById("status").textContent = msg; }
