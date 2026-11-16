@@ -44,6 +44,9 @@
   .dots span{display:inline-block;width:1.4vh;height:1.4vh;margin:0 .6vh;border-radius:50%;background:var(--cyan);animation:pulse 1.2s infinite ease-in-out}
   .dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
   @keyframes pulse{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+  .loadbar{width:36vw;height:1vh;border-radius:1vh;background:rgba(56,232,255,.15);overflow:hidden;margin-top:1vh}
+  .loadbar i{display:block;height:100%;width:0;background:var(--cyan);box-shadow:0 0 2vh var(--cyan);animation:fill var(--hold) linear forwards}
+  @keyframes fill{to{width:100%}}
   #status{font-size:1.6vh;color:#5a6478;text-align:right;margin-top:1vh}
   #status a{color:#8a96ad}
 </style>
@@ -59,6 +62,8 @@ const OWNER = "compitaconsulting";
 const REPO = "triviascoring";
 const BRANCH = "main";
 const POLL_SECONDS = 30;
+/* How long "Scores coming up" shows, with its loading bar, before new scores appear. */
+const HOLD_MS = 4000;
 /* Leave blank to use the only .xlsx file in the repo's top folder. */
 const FILE = "";
 /* ================================================================= */
@@ -165,9 +170,20 @@ function render(res){
   setTimeout(countUp, 300);
 }
 
+let revealing = false;
+function reveal(res, then){
+  revealing = true;
+  document.body.classList.add("waiting");
+  document.getElementById("sub").textContent = "";
+  const board = document.getElementById("board");
+  board.style.setProperty("--hold", HOLD_MS + "ms");
+  board.innerHTML = '<div class="wait"><img src="d2-logo.png" alt=""><b>Scores coming up</b><div class="loadbar"><i></i></div></div>';
+  setTimeout(() => { render(res); revealing = false; if (then) then(); }, HOLD_MS);
+}
 function status(msg){ document.getElementById("status").textContent = msg; }
 
 async function poll(){
+  if (revealing) return;
   try{
     const headers = {"Accept":"application/vnd.github+json"};
     if (listEtag) headers["If-None-Match"] = listEtag;
@@ -182,9 +198,10 @@ async function poll(){
     const b = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${pick.sha}`, {headers:{"Accept":"application/vnd.github.raw"}});
     if (!b.ok){ status(`Could not download the scoresheet (${b.status}). Retrying.`); return; }
     const wb = XLSX.read(await b.arrayBuffer(), {type:"array"});
-    render(parseScores(wb));
+    const res = parseScores(wb);
     lastSha = pick.sha;
-    document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from D2 repo via <a href="https://compitaconsulting.github.io/triviascoring/" target="_blank" rel="noopener">https://compitaconsulting.github.io/triviascoring/</a>`;
+    const stamp = () => document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from D2 repo via <a href="https://compitaconsulting.github.io/triviascoring/" target="_blank" rel="noopener">https://compitaconsulting.github.io/triviascoring/</a>`;
+    if (res.teams.length) reveal(res, stamp); else { render(res); stamp(); }
   }catch(e){ status("Connection problem. Retrying."); }
 }
 
