@@ -20,15 +20,19 @@
 <div id="counter"></div>
 <script>
 /* ===== Settings ===== */
-/* Number of slide images in the slides folder (slide01.jpg, slide02.jpg, ...). */
-const SLIDE_COUNT = 56;
-/* The live scoreboard is shown right after these slide numbers (the break slides and the last answer slide). */
-const SCOREBOARD_AFTER = [13, 32, 51, 55];
+/* Slide numbers match PowerPoint's. Images live in the "deck" folder, named the way
+   PowerPoint exports them: Slide1.jpg, Slide2.jpg ... (.jpeg and .png work too). */
+const SLIDE_COUNT = 57;
+/* Slides to leave out (hidden slides, answer lists you don't want on the TV). */
+const SKIP = [13];
+/* The live scoreboard is shown right after these slide numbers. */
+const SCOREBOARD_AFTER = [14, 33, 52, 56];
 /* ==================== */
 
+const NAMES = n => ["jpg","jpeg","JPG","JPEG","png","PNG"].map(x => `deck/Slide${n}.${x}`);
 const seq = [];
 for (let i = 1; i <= SLIDE_COUNT; i++){
-  seq.push({type:"img", src:`slides/slide${String(i).padStart(2,"0")}.jpg`});
+  if (!SKIP.includes(i)) seq.push({type:"img", n:i, srcs:NAMES(i)});
   if (SCOREBOARD_AFTER.includes(i)) seq.push({type:"board"});
 }
 const deck = document.getElementById("deck");
@@ -41,7 +45,10 @@ const sb = () => board.querySelector("iframe").contentWindow;
 seq.forEach(s => {
   if (s.type !== "img") { s.el = board; return; }
   const d = document.createElement("div"); d.className = "slide";
-  d.innerHTML = `<img src="${s.src}" alt="">`;
+  const im = document.createElement("img"); let k = 0;
+  /* Try each file name PowerPoint might have used until one loads. */
+  im.onerror = () => { if (++k < s.srcs.length) im.src = s.srcs[k]; else d.innerHTML = `<p style="color:#666;font:3vh Arial">Slide ${s.n} image not found in the deck folder</p>`; };
+  im.src = s.srcs[0]; d.appendChild(im);
   deck.appendChild(d); s.el = d;
 });
 
@@ -51,7 +58,7 @@ function show(i, fromBack){
   document.querySelectorAll(".slide.on").forEach(el => el.classList.remove("on"));
   seq[cur].el.classList.add("on");
   history.replaceState(null, "", "#" + (cur + 1));
-  document.getElementById("counter").textContent = `${cur + 1} / ${seq.length}`;
+  document.getElementById("counter").textContent = seq[cur].type === "board" ? "Scoreboard" : `Slide ${seq[cur].n}`;
   if (seq[cur].type === "board" && !fromBack){ try{ sb().replay(); }catch(e){} }
 }
 function onBoard(){ return seq[cur].type === "board"; }
@@ -83,8 +90,6 @@ document.addEventListener("click", next);
 document.addEventListener("contextmenu", e => { e.preventDefault(); prev(); });
 /* Moving the mouse briefly shows the slide number in the corner. */
 let peekTimer; document.addEventListener("mousemove", () => { document.body.classList.add("peek"); clearTimeout(peekTimer); peekTimer = setTimeout(() => document.body.classList.remove("peek"), 1500); });
-/* Load every slide image up front so nothing pops in late. */
-seq.forEach(s => { if (s.type === "img"){ const im = new Image(); im.src = s.src; } });
 show(cur, true);
 </script>
 </body>
