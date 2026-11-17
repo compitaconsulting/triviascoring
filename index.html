@@ -29,6 +29,7 @@
        font-size:var(--fs);opacity:0;transform:translateX(-4vw)}
   .row.show{animation:slide .55s cubic-bezier(.2,.8,.2,1) forwards}
   .row.hide{opacity:0;transform:translateX(-4vw);animation:none}
+  #board.nomove .row{grid-template-columns:var(--fs2) 0 1fr 9vw}
   @keyframes slide{to{opacity:1;transform:none}}
   .rank{width:var(--fs2);height:var(--fs2);border-radius:50%;display:flex;align-items:center;justify-content:center;
         font-weight:800;font-size:.8em;background:rgba(255,255,255,.08);color:#cfd6e4}
@@ -154,8 +155,8 @@ function revealAll(stagger){
 function loadPrev(){
   try{ const p = JSON.parse(localStorage.getItem("triviaPrev") || "null"); return p && Date.now() - p.at < 6*3600e3 ? p : null; }catch(e){ return null; }
 }
-function savePrev(teams){
-  try{ localStorage.setItem("triviaPrev", JSON.stringify({at:Date.now(), ranks:Object.fromEntries(teams.map(t=>[t.team,t.rank])), totals:Object.fromEntries(teams.map(t=>[t.team,t.total]))})); }catch(e){}
+function savePrev(teams, stage){
+  try{ localStorage.setItem("triviaPrev", JSON.stringify({at:Date.now(), stage:stage||0, ranks:Object.fromEntries(teams.map(t=>[t.team,t.rank])), totals:Object.fromEntries(teams.map(t=>[t.team,t.total]))})); }catch(e){}
 }
 
 function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -173,6 +174,7 @@ function render(res){
   board.style.setProperty("--fs", fs + "vh");
   board.style.setProperty("--fs2", (fs * 1.45) + "vh");
   const prev = res.prev !== undefined ? res.prev : loadPrev();
+  board.classList.toggle("nomove", !prev);
   board.innerHTML = res.teams.map((t,i) => {
     let mv = "", cls = "same";
     if (prev){
@@ -231,7 +233,14 @@ async function poll(){
     if (hash === lastHash) return;
     const res = parseScores(XLSX.read(buf, {type:"array"}));
     lastHash = hash;
-    if (res.teams.length){ res.prev = loadPrev(); savePrev(res.teams); }
+    if (res.teams.length){
+      /* Movement arrows only compare with an earlier board from the same game.
+         The first board of the night (or a fresh test) shows none. */
+      const stage = res.lastRound + (res.finalDone ? 1 : 0);
+      const p = loadPrev();
+      res.prev = (p && p.stage && p.stage < stage) ? p : null;
+      savePrev(res.teams, stage);
+    }
     lastRes = res;
     const stamp = () => document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from D2 repo via <a href="https://compitaconsulting.github.io/triviascoring/" target="_blank" rel="noopener">https://compitaconsulting.github.io/triviascoring/</a>`;
     if (res.teams.length) reveal(res, stamp);
