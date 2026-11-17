@@ -19,6 +19,38 @@
 <div id="deck"></div>
 <div id="counter"></div>
 <script>
+
+/* ===== HOW TO UPDATE THIS GAME EACH WEEK =====
+
+   SLIDES
+   1. In PowerPoint, export the deck as images:
+      Mac:     File > Export > File Format: JPEG > Save Every Slide
+      Windows: File > Export > Change File Type > JPEG > All Slides
+   2. Keep PowerPoint's file names (Slide1.jpg, Slide2.jpg, ...).
+   3. Upload them into the "deck" folder in the repo (open the folder on
+      github.com, then Add file > Upload files). Same-named files are replaced.
+   4. To fix one slide: export only that slide (Mac: Save Current Slide Only;
+      Windows: Just This One) and upload it into "deck" the same way.
+
+   SETTINGS BELOW (use PowerPoint's slide numbers)
+   - SLIDE_COUNT: the total number of slides in the deck.
+   - SKIP: slides to leave out, such as hidden slides or answer lists.
+     Example: [13]. Use [] if none.
+   - SCOREBOARD_AFTER: the slides the live scoreboard follows, usually each
+     break slide and the last answer slide of the final round.
+     Example for Rounds 1-2, break, Rounds 3-4, break, final:
+     [<break 1 slide>, <break 2 slide>, <last final answer slide>]
+
+   SCORESHEET
+   - Keep the file named Scoresheet.xlsx and upload it to the repo's top
+     folder at each break. Leave unused rounds (for example R5 and R6) blank.
+   - The scoreboard labels itself ("After Round 2", "After Round 4",
+     "Final Scores") from whichever rounds have scores.
+   - Start each game night by uploading a blank Scoresheet.xlsx.
+
+   index.html is the scoreboard. It needs no weekly changes.
+   ============================================== */
+ 
 /* ===== Settings ===== */
 /* Slide numbers match PowerPoint's. Images live in the "deck" folder, named the way
    PowerPoint exports them: Slide1.jpg, Slide2.jpg ... (.jpeg and .png work too). */
