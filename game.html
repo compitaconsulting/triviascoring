@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D2 Trivia Night</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#000;overflow:hidden;cursor:none}
+  .slide{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .35s ease;pointer-events:none}
+  .slide.on{opacity:1}
+  .slide img{max-width:100vw;max-height:100vh;width:auto;height:auto;object-fit:contain}
+  .slide iframe{border:0;width:100vw;height:100vh}
+  #counter{position:fixed;right:1vw;bottom:1vh;font:1.4vh Arial,sans-serif;color:#444;opacity:0;transition:opacity .3s}
+  body.peek #counter{opacity:1}
+</style>
+</head>
+<body>
+<div id="deck"></div>
+<div id="counter"></div>
+<script>
+/* ===== Settings ===== */
+/* Number of slide images in the slides folder (slide01.jpg, slide02.jpg, ...). */
+const SLIDE_COUNT = 56;
+/* The live scoreboard is shown right after these slide numbers (the break slides and the last answer slide). */
+const SCOREBOARD_AFTER = [13, 32, 51, 55];
+/* ==================== */
+
+const seq = [];
+for (let i = 1; i <= SLIDE_COUNT; i++){
+  seq.push({type:"img", src:`slides/slide${String(i).padStart(2,"0")}.jpg`});
+  if (SCOREBOARD_AFTER.includes(i)) seq.push({type:"board"});
+}
+const deck = document.getElementById("deck");
+const board = document.createElement("div");
+board.className = "slide";
+board.innerHTML = '<iframe src="index.html" title="Scoreboard" style="pointer-events:none"></iframe>';
+deck.appendChild(board);
+const sb = () => board.querySelector("iframe").contentWindow;
+
+seq.forEach(s => {
+  if (s.type !== "img") { s.el = board; return; }
+  const d = document.createElement("div"); d.className = "slide";
+  d.innerHTML = `<img src="${s.src}" alt="">`;
+  deck.appendChild(d); s.el = d;
+});
+
+let cur = Math.min(seq.length - 1, Math.max(0, (parseInt(location.hash.slice(1)) || 1) - 1));
+function show(i, fromBack){
+  cur = Math.max(0, Math.min(seq.length - 1, i));
+  document.querySelectorAll(".slide.on").forEach(el => el.classList.remove("on"));
+  seq[cur].el.classList.add("on");
+  history.replaceState(null, "", "#" + (cur + 1));
+  document.getElementById("counter").textContent = `${cur + 1} / ${seq.length}`;
+  if (seq[cur].type === "board" && !fromBack){ try{ sb().replay(); }catch(e){} }
+}
+function onBoard(){ return seq[cur].type === "board"; }
+function next(){
+  if (onBoard()){
+    let w; try{ w = sb(); }catch(e){}
+    if (w && w.busy && w.busy()) return;                  /* still on "Scores coming up" */
+    if (w && w.allShown && !w.allShown()){ w.revealNext(); return; }
+  }
+  show(cur + 1);
+}
+function prev(){
+  if (onBoard()){
+    let w; try{ w = sb(); }catch(e){}
+    if (w && w.shownCount && w.shownCount() > 0 && !w.busy()){ w.hideLast(); return; }
+  }
+  show(cur - 1, true);
+}
+document.addEventListener("keydown", e => {
+  const k = e.key;
+  if (k === " " || k === "ArrowRight" || k === "PageDown" || k === "Enter"){ e.preventDefault(); next(); }
+  else if (k === "ArrowLeft" || k === "PageUp" || k === "Backspace"){ e.preventDefault(); prev(); }
+  else if (k === "Home"){ show(0, true); }
+  else if (k === "End"){ show(seq.length - 1, true); }
+  else if ((k === "a" || k === "A") && onBoard()){ try{ sb().revealAll(); }catch(err){} }
+  else if (k === "f" || k === "F"){ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
+});
+document.addEventListener("click", next);
+document.addEventListener("contextmenu", e => { e.preventDefault(); prev(); });
+/* Moving the mouse briefly shows the slide number in the corner. */
+let peekTimer; document.addEventListener("mousemove", () => { document.body.classList.add("peek"); clearTimeout(peekTimer); peekTimer = setTimeout(() => document.body.classList.remove("peek"), 1500); });
+/* Load every slide image up front so nothing pops in late. */
+seq.forEach(s => { if (s.type === "img"){ const im = new Image(); im.src = s.src; } });
+show(cur, true);
+</script>
+</body>
+</html>

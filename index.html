@@ -172,7 +172,7 @@ function render(res){
   const fs = Math.max(2.3, Math.min(4.6, (68 / n - 1) / 1.25));
   board.style.setProperty("--fs", fs + "vh");
   board.style.setProperty("--fs2", (fs * 1.45) + "vh");
-  const prev = loadPrev();
+  const prev = res.prev !== undefined ? res.prev : loadPrev();
   board.innerHTML = res.teams.map((t,i) => {
     let mv = "", cls = "same";
     if (prev){
@@ -190,9 +190,8 @@ function render(res){
       <div class="score" data-from="${from}" data-to="${t.total}">${fmt(from)}</div>
     </div>`;
   }).join("");
-  savePrev(res.teams);
   shown = 0;
-  if (STEP_REVEAL) board.insertAdjacentHTML("beforeend", '<div class="hint">Here We Go!</div>');
+  if (STEP_REVEAL) board.insertAdjacentHTML("beforeend", '<div class="hint">Press Space or click to reveal</div>');
   else revealAll(70);
 }
 
@@ -213,6 +212,12 @@ function reveal(res, then){
 function status(msg){ document.getElementById("status").textContent = msg; }
 
 let lastHash = null;
+/* Hooks used by game.html, which shows this page as a slide. */
+let lastRes = null;
+function replay(){ if (lastRes && lastRes.teams.length && !revealing) reveal(lastRes, null); }
+function allShown(){ return !revealing && shown >= rows().length; }
+function busy(){ return revealing; }
+function shownCount(){ return shown; }
 async function poll(){
   if (revealing) return;
   try{
@@ -226,6 +231,8 @@ async function poll(){
     if (hash === lastHash) return;
     const res = parseScores(XLSX.read(buf, {type:"array"}));
     lastHash = hash;
+    if (res.teams.length){ res.prev = loadPrev(); savePrev(res.teams); }
+    lastRes = res;
     const stamp = () => document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})} from D2 repo via <a href="https://compitaconsulting.github.io/triviascoring/" target="_blank" rel="noopener">https://compitaconsulting.github.io/triviascoring/</a>`;
     if (res.teams.length) reveal(res, stamp);
     else { render(res); status(`Scoresheet found, but it has no teams with scores yet (checked ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})})`); }
