@@ -242,7 +242,7 @@ async function poll(){
       savePrev(res.teams, stage);
     }
     lastRes = res;
-    const stamp = () => document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})};
+    const stamp = () => document.getElementById("status").innerHTML = `Updated ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})}`;
     if (res.teams.length) reveal(res, stamp);
     else { render(res); status(`Scoresheet found, but it has no teams with scores yet (checked ${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})})`); }
   }catch(e){ status("Connection problem. Retrying."); }
