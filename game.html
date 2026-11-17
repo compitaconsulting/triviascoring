@@ -70,7 +70,11 @@ for (let i = 1; i <= SLIDE_COUNT; i++){
 const deck = document.getElementById("deck");
 const board = document.createElement("div");
 board.className = "slide";
-board.innerHTML = '<iframe src="index.html" title="Scoreboard" style="pointer-events:none"></iframe>';
+
+
+board.innerHTML = '<iframe src="index.html?v=' + Date.now() + '" title="Scoreboard" style="pointer-events:none"></iframe>';
+
+ 
 deck.appendChild(board);
 const sb = () => board.querySelector("iframe").contentWindow;
 
