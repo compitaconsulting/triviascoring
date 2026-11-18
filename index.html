@@ -166,7 +166,7 @@ function render(res){
   document.getElementById("sub").textContent = res.finalDone ? "Final Scores" : (res.lastRound ? `After Round ${res.lastRound}` : "");
   document.body.classList.toggle("waiting", !res.teams.length);
   if (!res.teams.length){
-    board.innerHTML = '<div class="wait"><img src="d2-logo.png" alt=""><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div>';
+    board.innerHTML = '<div class="wait"><img src="d2-logo.png" alt=""><b>Updating the Scoreboard</b><div class="dots"><span></span><span></span><span></span></div></div>';
     return;
   }
   const n = res.teams.length;
