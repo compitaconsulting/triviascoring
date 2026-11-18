@@ -204,7 +204,7 @@ function reveal(res, then){
   document.getElementById("sub").textContent = "";
   const board = document.getElementById("board");
   board.style.setProperty("--hold", HOLD_MS + "ms");
-  board.innerHTML = '<div class="wait"><img src="d2-logo.png" alt=""><b>Scores coming up</b><div class="loadbar"><i></i></div></div>';
+  board.innerHTML = '<div class="wait"><img src="d2-logo.png" alt=""><b>Updating the Scoreboard</b><div class="loadbar"><i></i></div></div>';
   setTimeout(() => {
     try{ render(res); if (then) then(); }
     catch(e){ status("Could not draw the board: " + e.message); }
