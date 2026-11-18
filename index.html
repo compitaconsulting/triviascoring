@@ -60,15 +60,15 @@
 <body class="waiting">
 <img class="logo" src="d2-logo.png" alt="D2 Productions">
 <div class="head"><h1>SCOREBOARD</h1><div class="sub" id="sub"></div></div>
-<div id="board"><div class="wait"><img src="d2-logo.png" alt=""><b>Scores coming up</b><div class="dots"><span></span><span></span><span></span></div></div></div>
-<div id="status">Checking GitHub for the scoresheet</div>
+<div id="board"><div class="wait"><img src="d2-logo.png" alt=""><b><Updating the Scoreboard/b><div class="dots"><span></span><span></span><span></span></div></div></div>
+<div id="status">Checking GitHub for the current scoresheet</div>
 <script>
 /* ===== Settings ===== */
 /* The scoresheet's file name in the repo. Keep it the same all night. */
 const FILE = "Scoresheet.xlsx";
 const POLL_SECONDS = 15;
 /* How long "Scores coming up" shows, with its loading bar, before new scores appear. */
-const HOLD_MS = 2500;
+const HOLD_MS = 2000;
 /* true: click, Space, or Right Arrow shows one team at a time, last place first.
    Left Arrow hides the last one shown. A shows all. false: every team appears on its own. */
 const STEP_REVEAL = true;
